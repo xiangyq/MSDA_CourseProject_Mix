@@ -1,7 +1,6 @@
 ---
 title: "Gene Expression Analysis"
 author: "Youqing Xiang"
-date: "12/5/2016"
 output: pdf_document
 ---
 
