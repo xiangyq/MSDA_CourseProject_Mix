@@ -1,0 +1,90 @@
+---
+title: "Gene Expression Analysis"
+author: "Youqing Xiang"
+date: "12/5/2016"
+output: pdf_document
+---
+
+```{r warning=FALSE, message=FALSE}
+library(dplyr)
+library(caTools)
+library(randomForest)
+```
+
+### Introduction
+
+This project is focusing on taking advantage of Principal Components Analysis (PCA) tehnique to reduce the dimensions. Here is the [link](http://archive.ics.uci.edu/ml/datasets/gene+expression+cancer+RNA-Seq) for the data source. This data has 20531 variables but only has 801 observations. The data set is part of the RNA-Seq (HiSeq) PANCAN data set, it is a random extraction of gene expressions of patients having five different types of tumor: BRCA, KIRC, COAD, LUAD and PRAD. After reducing the number of dimensions, I also tried to build a model to predict the type of tumor.
+
+### Loading the data
+
+```{r}
+genes <- read.csv('Data/data.csv')
+labels <- read.csv('Data/labels.csv')
+dim(genes)
+head(genes[,1:5])
+unique(labels$Class)
+```
+
+### Cleaning the data
+
+```{r}
+genes <- genes[,colSums(genes !=0)>0]
+dim(genes)
+```
+
+There are some of columns with all zero values, which won't contribute any to the classifiction of tumor types. So, here I got ride of those columns.
+
+### Reducing the dimensions with PCA
+
+```{r}
+A <- as.matrix(select(genes,-X))
+df <- select(labels,-X)
+
+i = 1
+while (i < 26) {
+  pca_i <- princomp(A[,((i-1)*800+1):(i*800)],center=T,scale.=T)
+  pca_i <- as.data.frame(pca_i$scores[,1:10])
+  df <- cbind(df,pca_i)
+  i = i + 1
+}
+
+pca_26 <- princomp(A[,20000:20264],center=T,scale.=T)
+pca_26 <- as.data.frame(pca_26$scores[,1:10])
+df <- cbind(df,pca_26)
+colnames(df) <- c('Class',1:260)
+colnames(df) <- paste("N", colnames(df), sep = "_")
+dim(df)
+head(df[,1:5])
+```
+
+For this step, I performed PCA technique for every 800 variables and only kept top 10 components. For the last 264 variable, I also kept top 10 components. Together I did 26 run PCA and got 260 components in total.
+
+### Splitting the data into Train/Test sets
+
+```{r}
+sample <- sample.split(df$N_Class, SplitRatio = 0.7)
+train <- subset(df, sample==T)
+test <- subset(df, sample==F)
+dim(train)
+dim(test)
+```
+
+### Training the model
+
+```{r}
+rf.model <- randomForest(N_Class ~ ., data = train, importance=TRUE)
+rf.model$confusion
+```
+
+### Testing the model
+
+```{r}
+rf.preds <- predict(rf.model, test,type='response')
+table(rf.preds,test$N_Class)
+```
+
+### Discussion
+1) PCA is an effective way to dramatically reduce the dimension of data.
+2) randomForest model gives high accuracy prediction.
+3) I have 260 PCA components at the end. However, this number is still high, considering there are only 801 rows of data. So, overfitting is a potential problem.
+4) For this data set, 20531 genes' expression were measured. In reality, due to the cost of test, we may be able to measure a certain number of gene expression for each patient. So, how to find the genes which are relate to the type of tumor should be the focus in the future study.
